@@ -1,0 +1,84 @@
+-- Usando JSON-b en Postgres
+
+-- https://dbfiddle.uk/?rdbms=postgres_13&fiddle=6325c6ae74d7c1fe0c57c6831caaabc0
+-- https://dbfiddle.uk/?rdbms=postgres_13&fiddle=5f2edbe94b955c76d03578f79e3af74a
+
+CREATE TABLE people (
+  data jsonb,
+  id uuid default gen_random_uuid(),
+  PRIMARY KEY (id)
+);
+
+INSERT INTO people VALUES
+    ('{"pets_number": 1, "name": "Adam", "pet_type": ["Cat"], "birth_country": "Spain", "is_developer": false, "birth_datetime": "1983-01-03 08:53:22"}'),
+    ('{"pets_number": 2, "name": "Sandra", "pet_type": ["Bird", "Cat"], "birth_country": "Spain", "is_developer": true, "birth_datetime": "1982-12-17 03:53:22"}'),
+    ('{"pets_number": 0, "name": "Dolores", "pet_type": [], "birth_country": "Spain", "is_developer": true, "birth_datetime": "1963-07-03 06:53:22"}'),
+    ('{"pets_number": 3, "name": "Joseph", "pet_type": ["Bird"], "birth_country": "Spain", "is_developer": true, "birth_datetime": "1991-11-01 01:53:22"}'),
+    ('{"pets_number": 1, "name": "Frank", "pet_type": ["Dog"], "birth_country": "Germany", "is_developer": true, "birth_datetime": "2001-02-17 18:53:22"}'),
+    ('{"pets_number": 5, "name": "Amalia", "pet_type": ["Bird", "Cat", "Horse", "Turtle", "Fish"], "birth_country": "Argentina", "is_developer": true, "birth_datetime": "1993-09-17 16:53:22"}'),
+    ('{"pets_number": 2, "name": "Lucille", "pet_type": ["Dog", "Fish"], "birth_country": "France", "is_developer": true, "birth_datetime": "1994-03-08 12:53:22"}'),
+    ('{"pets_number": 0, "name": "George", "pet_type": [], "birth_country": "Spain", "is_developer": true, "birth_datetime": "1979-12-21 01:53:22"}'),
+    ('{"pets_number": 2, "name": "Juan", "pet_type": ["Dog"], "birth_country": "Spain", "is_developer": false, "birth_datetime": "1986-04-03 09:53:22"}'),
+    ('{"pets_number": 1, "name": "Monica", "pet_type": ["Horse"], "birth_country": "Spain", "is_developer": true, "birth_datetime": "1992-05-14 07:53:22"}')
+;
+
+-- DB Schema
+/*
+data - JSON
+id - varchars
+*/
+
+-- Query 1
+select *
+from people
+where jsonb_path_match_tz(people.data, 
+'exists($.birth_datetime ? (@.datetime() > "2000-01-01".datetime()))');
+
+/*
+{"name": "Frank", "pet_type": ["Dog"], "pets_number": 1, "is_developer": true, "birth_country": "Germany", "birth_datetime": "2001-02-17 18:53:22"}     488dfcaf-5c99-4097-9902-3fe4a5c661e4
+*/
+
+-- Query 2
+select *
+from people
+where jsonb_path_match_tz(people.data, 
+'exists($.pets_number ? (@>=1 && @<=3))');
+
+/*
+{"name": "Adam", "pet_type": ["Cat"], "pets_number": 1, "is_developer": false, "birth_country": "Spain", "birth_datetime": "1983-01-03 08:53:22"}	bb1e2c02-8fdb-409e-9dd0-cdcc75db988a
+{"name": "Sandra", "pet_type": ["Bird", "Cat"], "pets_number": 2, "is_developer": true, "birth_country": "Spain", "birth_datetime": "1982-12-17 03:53:22"}	218a459a-6065-42c3-a828-aba916fc967d
+{"name": "Joseph", "pet_type": ["Bird"], "pets_number": 3, "is_developer": true, "birth_country": "Spain", "birth_datetime": "1991-11-01 01:53:22"}	9a83d5d2-ee58-4b7f-bd70-a491564e46b4
+{"name": "Frank", "pet_type": ["Dog"], "pets_number": 1, "is_developer": true, "birth_country": "Germany", "birth_datetime": "2001-02-17 18:53:22"}	7d7bc7aa-823d-4558-87d2-8142aa67912c
+{"name": "Lucille", "pet_type": ["Dog", "Fish"], "pets_number": 2, "is_developer": true, "birth_country": "France", "birth_datetime": "1994-03-08 12:53:22"}	5f731466-b84c-49d7-bc8c-43dfb6dd42f6
+{"name": "Juan", "pet_type": ["Dog"], "pets_number": 2, "is_developer": false, "birth_country": "Spain", "birth_datetime": "1986-04-03 09:53:22"}	f47f9866-9bc8-496c-ba90-1b480be716b0
+{"name": "Monica", "pet_type": ["Horse"], "pets_number": 1, "is_developer": true, "birth_country": "Spain", "birth_datetime": "1992-05-14 07:53:22"}	e6344f07-391f-47f5-b799-e9b5f51de7ce
+*/
+
+-- Query 3
+select *
+from people
+where data -> 'is_developer' = 'false'::jsonb;
+
+-- OR
+
+select *
+from people
+where data @@ '$.is_developer == false';
+
+/*
+{"name": "Adam", "pet_type": ["Cat"], "pets_number": 1, "is_developer": false, "birth_country": "Spain", "birth_datetime": "1983-01-03 08:53:22"}	985e6120-5fb6-4cc6-8f91-4879c2082096
+{"name": "Juan", "pet_type": ["Dog"], "pets_number": 2, "is_developer": false, "birth_country": "Spain", "birth_datetime": "1986-04-03 09:53:22"}	94d8266e-e333-4cb5-baa1-9371a4064116
+*/
+
+-- Query 4
+select
+  data -> 'name' as name,
+  data -> 'notes' -> 'profession' as profession
+from people
+where data -> 'is_developer' = 'false'::jsonb;
+
+/*
+name    profession
+"Adam"  null
+"Juan"  null
+*/
